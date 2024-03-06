@@ -1,0 +1,7 @@
+airgeddon
+
+hashcat -m 16800 war_games.txt ~/Documents/hek/wordlists/rockyou.txt 
+
+
+wireshark filter (data):
+(wlan.sa == A0:04:60:39:91:A5 || wlan.ta == A0:04:60:39:91:A5 || wlan.ra == A0:04:60:39:91:A5 ) && wlan.fc.type_subtype == 0x20
