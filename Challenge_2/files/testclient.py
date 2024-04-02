@@ -34,7 +34,8 @@ msg1 = {
 msg1_encoded = json.dumps(msg1).encode()
 
 # Server address and port
-server_address = ('nkp.mhgb.net', 10002)
+#server_address = ('nkp.mhgb.net', 10002)
+server_address = ('localhost', 10002)
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 try:
