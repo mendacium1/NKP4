@@ -55,9 +55,9 @@ class ThreadedServer(object):
 	with open('server_keys.json') as json_file:
 		params = json.load(json_file)
 		# id and key pair for server
-		serverid = b64decode( params['id2'] )
+		serverid = b64decode( params['testserver_id'] )
 		logging.info(f"Read server ID: {serverid}.")
-		ed_sign = ed25519.SigningKey( b64decode( params['sign2'] ) )
+		ed_sign = ed25519.SigningKey( b64decode( params['testserver_sign_key'] ) )
 		logging.info("Read signing key.")
 		ed_verif = ed_sign.get_verifying_key()
 		logging.info("Extracted verification key.")
@@ -206,7 +206,7 @@ class ThreadedServer(object):
 					# Send response
 					client.sendall( msg4 )
 				else:
-					loggin.warning('Client disconnected.')
+					logging.warning('Client disconnected.')
 					raise Exception('Client disconnected')
 			except Exception as inst:
 				client.close()

@@ -6,14 +6,11 @@ from Crypto.Cipher import ChaCha20_Poly1305
 from Crypto.Hash import SHA256
 from pure25519.basic import Base, L, bytes_to_unknown_group_element
 from pure25519 import ed25519_oop as ed25519
-import json
-from base64 import b64encode
-from os import urandom
-from pure25519 import ed25519_oop as ed25519
-
-# -- logging setup
 import logging
 from rich.logging import RichHandler
+from os import urandom
+
+# -- logging setup
 logging.basicConfig(
     level="NOTSET",
     format="%(message)s",
@@ -50,7 +47,6 @@ def generate_client_keys():
 
     print("Client keys and ID have been generated and stored in client_keys.json")
 
-
 generate_client_keys()
 
 # Load client parameters (ID and key pair)
@@ -63,9 +59,9 @@ with open('client_keys.json') as json_file:
     ed_verif = ed_sign.get_verifying_key()
     logging.info("Client verification key extracted.")
 
-# Compute g^x and integer i from client ID
+# Compute g^x and integer i from client ID, x is your private key
 x = randrange(L)
-gx = Base.scalarmult(x)
+gx = Base.scalarmult(x)  # Here you would replace gx with your small order point if experimenting
 i = int(SHA256.new(client_id).hexdigest(), base=16) % L
 gi = Base.scalarmult(i)
 
@@ -80,7 +76,7 @@ logging.info(f"Connected to server at {host}:{port}.")
 # Prepare and send the first message
 msg1 = json.dumps({
     'id': to_base64(client_id),
-    'gx': to_base64(gx),
+    'gx': to_base64(gx.to_bytes()),
     'cert': to_base64(ed_verif.to_bytes())
 }).encode()
 sock.sendall(msg1)
@@ -91,12 +87,12 @@ response = sock.recv(1024)
 logging.info(f"Received server response: {response}")
 response_data = json.loads(response.decode())
 gy = bytes_to_unknown_group_element(from_base64(response_data['gy']))
-gxy = gy.scalarmult(x)
-key = SHA256.new(gxy.to_bytes()).digest()
+gxy = gy.scalarmult(x)  # Correctly compute the shared secret
+key = SHA256.new(gxy.to_bytes()).digest()  # Derive the key from the shared secret
 logging.info(f"Computed shared key: {key.hex()}")
 
 # Prepare and send the third message
-nonce = randrange(1 << 64)  # Simple nonce generation, should be improved in real applications
+nonce = randrange(1 << 64)
 cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce.to_bytes(12, 'little'))
 plaintext3 = gi.to_bytes() + ed_sign.sign(SHA256.new(key).digest())
 ciphertext3, tag3 = cipher.encrypt_and_digest(plaintext3)
@@ -120,9 +116,8 @@ tag4 = from_base64(final_data['tag'])
 cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce)
 try:
     plaintext4 = cipher.decrypt_and_verify(ciphertext4, tag4)
-    logging.info("Server's final message decrypted and verified successfully.")
-    # Process plaintext4 as needed (verify signature, check success flag, etc.)
     print("plaintext4\n" + str(plaintext4))
+    logging.info("Server's final message decrypted and verified successfully.")
 except ValueError as e:
     logging.error("Decryption or verification failed.")
 

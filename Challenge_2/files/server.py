@@ -52,16 +52,17 @@ class ThreadedServer(object):
 	with open('server_keys.json') as json_file:
 		params = json.load(json_file)
 		# id and key pair for server
-		serverid = b64decode( params['id1'] )
+		serverid = b64decode( params['server_id'] )
 		logging.info(f"Read server ID: {serverid}.")
-		ed_sign = ed25519.SigningKey( b64decode( params['sign1'] ) )
+		ed_sign = ed25519.SigningKey( b64decode( params['server_sign_key'] ) )
 		logging.info("Read signing key.")
 		ed_verif = ed_sign.get_verifying_key()
 		logging.info("Extracted verification key.")
 		# id and verification key for second server
-		friendlyid = b64decode( params['id2'] )
+		friendlyid = b64decode( params['testserver_id'] )
+		print("friendlyid:\n" + str(friendlyid))
 		logging.info(f"Read testserver ID: {friendlyid}.")
-		friendly_ed_verif = ed25519.VerifyingKey( b64decode( params['verif2'] ) )
+		friendly_ed_verif = ed25519.VerifyingKey( b64decode( params['testserver_verif_key'] ) )
 		logging.info("Read testserver verification key.")
 		# flag to be captured
 		flag = bytes( params['flag'], 'utf-8' )
@@ -220,14 +221,14 @@ class ThreadedServer(object):
 					msg4 = self.response2( msg3, state )
 					client.sendall( msg4 )
 				else:
-					loggin.warning('Client disconnected.')
+					logging.warning('Client disconnected.')
 					raise Exception('Client disconnected.')
 			except Exception as inst:
 				client.close()
 				return False
 
 if __name__ == "__main__":
-	ThreadedServer('185.252.72.138',10001).listen()
+	ThreadedServer('127.0.0.1',10001).listen()
 
 
 
