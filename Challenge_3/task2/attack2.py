@@ -1,22 +1,27 @@
 import socket
 import json
+import string
+import requests
 
-from itertools import cycle, islice
-
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 def xor_bytes(a, b):
-    #max_len = max(len(a), len(b))
-    
-    print(f"a: {a.hex()}")
-    print(f"b: {b.hex()}")
-    # Cycle through the shorter byte string if lengths differ and ensure it has the same length as the longer string
-    if len(a) > len(b):
-        b = b[-len(a):]
-    if len(a) > len(b):
-        b = cycle(b)
+    a_n = a[:16]
+    b_n = b[:16]
+    x = bytes(x ^ y for x, y in zip(a_n, b_n))
+
 
     # Perform XOR while generating bytes from zipped a and b
-    return bytes(x ^ y for x, y in zip(a, b))
+    return x + a[16:]
 
 def send_message(s, plaintext, initial_iv=None):
     """ Send a message over an existing socket connection and handle response. """
@@ -25,12 +30,11 @@ def send_message(s, plaintext, initial_iv=None):
     if isinstance(plaintext, str):
         plaintext = plaintext.encode('utf-8')
 
-    print(f"input plaintext: {plaintext.hex()}")
     # If initial_iv is provided, calculate the new plaintext
     if initial_iv:
         plaintext = xor_bytes(plaintext, initial_iv)
+        #print(f"send message:\t\t{plaintext.hex()}")
 
-    print(f"xor'ed plaintext: {plaintext.hex()}")
     # Send the plaintext
     s.sendall(plaintext)
 
@@ -50,87 +54,99 @@ def send_message(s, plaintext, initial_iv=None):
 def pj(json_dict):
     return json.dumps(json_dict, indent=4, sort_keys=True)
 
-
-def main():
-    host = '193.170.192.172'
-    port = 80
-    initial_message = bytes.fromhex("00") * (32-len('secret2='))
-    initial_message = bytes.fromhex("00") * (16)
+def task_2(host, port):
 
     # Set up the socket connection
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
 
-        # Send the initial message and get the first response
-        print(f"Sending inital message: {initial_message} -> len={len(initial_message)}")
-        response_data = send_message(s, initial_message)
-        print(f"Received response: {pj(response_data)}\nlen(response): {len(response_data['ciphertext'])}")
-        #initial_iv = bytes.fromhex(response_data['iv'])
-        initial_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
-        print(f"Calculated next IV: {initial_iv.hex()}")
+        sec_size = len(b"secret2=")
 
-        print("---------------------------------------------------")
+        # get secret length in bytes:
+        response_data = send_message(s, b" ")
+        secret_length = len(response_data['ciphertext']) - sec_size
 
-        #Test if can create same ciphertext again
-        print(f"Testing to get identical ciphertext: {initial_message}  -> len={len(initial_message)}\nwith {initial_iv.hex()}")
-        response_data = send_message(s, initial_message, initial_iv)
-        print(f"Received response: {pj(response_data)}\nlen(response): {len(response_data['ciphertext'])}")
-        initial_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
-        print(f"Calculated next IV: {initial_iv.hex()}\n")
+        byte_size = secret_length + (16 - (secret_length % 16))
+        hex_size = byte_size * 2
 
-        response_data = send_message(s, initial_message, initial_iv)
-        print(f"Identical response: {pj(response_data)}\nlen(response): {len(response_data['ciphertext'])}")
-        initial_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
-        print(f"Calculated next IV: {initial_iv.hex()}")
+        init_message = bytes.fromhex("00") * byte_size
+        reference_message = bytes.fromhex("00") * (byte_size - sec_size - 1)
+        init_bf_message = bytes.fromhex("00") * (byte_size - sec_size - 1) + b"secret2="
 
-        response_data = send_message(s, initial_message, initial_iv)
-        print(f"Identical response: {pj(response_data)}\nlen(response): {len(response_data['ciphertext'])}")
-        initial_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
-        print(f"Calculated next IV: {initial_iv.hex()}")
-        
-        print("---------------------------------------------------")
 
-        print(f"Removing 1 byte to get first secret byte.\nbefore:\t{initial_message}")
-        brute_force_bytes = initial_message[:-1]
-        print(f"after:\t{brute_force_bytes}")
-        response_data = send_message(s, brute_force_bytes, initial_iv)
-        print(f"Received response: {pj(response_data)}")
+        secret2 = ""
+        for j in range(0, 100):
+            #print(f"init_message:\t\t{init_message.hex()}\t\tlen -> {len(init_message)}")
+            #print(f"reference_message:\t{reference_message.hex()}\t\t\t\t\t\t\tlen -> {len(reference_message)}")
+            #print(f"init_bf_message:\t{init_bf_message.hex()}\t\t\tlen -> {len(init_bf_message)}")
+            #init reset
+            init_iv = bytes.fromhex(send_message(s, init_message)['ciphertext'])[-16:]
+            # get reference
+            response_data = send_message(s, reference_message, init_iv)
+            reference_cipher = response_data['ciphertext'][:hex_size]
+            #print(f"reference_cipher:\t{reference_cipher}\t\tlen -> {len(reference_cipher)/2}")
+            bf_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
 
-        iv_store = initial_iv
-        m_store = response_data['ciphertext']
+            """
+            current_char = ""
 
-        for char in range(0,255):
-            test_bytes = brute_force_bytes + char.to_bytes(2, 'big')
-            response_data = send_message(s, test_bytes, initial_iv)
-            if response_data['ciphertext'] == m_store:
-                print("found something")
-            
-        
-"""        
-        print("---------------------------------------------------")
+            for char in string.printable:
+                #print("------------------------------------------------------------------------------------------------")
+                bf_message = init_bf_message + char.encode()
+                #print(f"bf_message:\t\t\t{bf_message.hex()}\t\tlen -> {len(bf_message)}")
 
-        print(f"Removing 1 byte to get first secret byte.\nbefore:\t{initial_message}")
-        brute_force_bytes = initial_message[:-1]
-        print(f"after:\t{brute_force_bytes}")
-        response_data = send_message(s, brute_force_bytes, initial_iv)
-        print(f"Received response: {pj(response_data)}")
+                response_data = send_message(s, bf_message, bf_iv)
+                bf_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
+                #print(f"Check:\t\t\t\t{response_data['ciphertext'][:hex_size]}")
+                #print(f"with:\t\t\t\t{reference_cipher}")
+                if response_data['ciphertext'][:hex_size] == reference_cipher:
+                    #print(f"{bcolors.OKGREEN}found it: {char}{bcolors.ENDC}")
+                    current_char = char
+                    break
+            if current_char == "":
+                print(f"{bcolors.FAIL}Done{bcolors.ENDC}")
+                exit()
+            reference_message = reference_message[:-1]
+            init_bf_message = init_bf_message[1:] + current_char.encode()
+            secret += current_char
+            print(f"{bcolors.HEADER}secret=:\t{secret}{bcolors.ENDC}")
+            """
+            current_char = 0
 
-        print("---------------------------------------------------")
+            for char in range(0, 256):
+                # print("------------------------------------------------------------------------------------------------")
+                bf_message = init_bf_message + char.to_bytes(1, 'big')
+                # print(f"bf_message:\t\t\t{bf_message.hex()}\t\tlen -> {len(bf_message)}")
 
-        print(f"Removing 1 byte to get first secret byte.\nbefore:\t{initial_message}")
-        brute_force_bytes = initial_message[:-1]
-        print(f"after:\t{brute_force_bytes}")
-        response_data = send_message(s, brute_force_bytes, initial_iv)
-        print(f"Received response: {pj(response_data)}")
-        
-        print("---------------------------------------------------")
+                response_data = send_message(s, bf_message, bf_iv)
+                bf_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
+                # print(f"Check:\t\t\t\t{response_data['ciphertext'][:hex_size]}")
+                # print(f"with:\t\t\t\t{reference_cipher}")
+                if response_data['ciphertext'][:hex_size] == reference_cipher:
+                    # print(f"{bcolors.OKGREEN}found it: {char}{bcolors.ENDC}")
+                    current_char = char
+                    break
+            if current_char == 0:
+                print(f"{bcolors.FAIL}Done{bcolors.ENDC}")
+                break
+            reference_message = reference_message[:-1]
+            init_bf_message = init_bf_message[1:] + current_char.to_bytes(1, 'big')
+            secret2 += chr(current_char)
+            print(f"{bcolors.HEADER}secret2={secret2}{bcolors.ENDC}")
 
-        print(f"Removing 1 byte to get first secret byte.\nbefore:\t{initial_message}")
-        brute_force_bytes = initial_message[:-1]
-        print(f"after:\t{brute_force_bytes}")
-        response_data = send_message(s, brute_force_bytes, initial_iv)
-        print(f"Received response: {pj(response_data)}")
-"""      
+def main():
+    host = '193.170.192.172'
+    port = 80
+    cookie_2 = task_2(host, port)
+
+    url = 'https://www.moneybit.at/challenge3.php'
+    cookies = {
+        'secret': 'Vanillle',
+        'secret2': cookie_2
+    }
+
+    response = requests.get(url, cookies=cookies)
+    print(response.text)
 
 if __name__ == "__main__":
     main()
