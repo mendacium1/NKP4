@@ -24,14 +24,14 @@ for i in range(8):
     d = dict()
     for char in ascii_letters:
         d[char] = send_and_get_len(string + char)
-        print(f"trying: {string + char}")
+        print(f"len: {d[char]}\ttrying: {string + char}")
 
     res = dict((v,k) for k,v in d.items())
     if len(res) < 2:
         d=dict()
         for char in ascii_letters:
             d[char+char] = send_and_get_len(string + char + char)
-            print(f"trying: {string + char + char}")
+            print(f"len: {d[char+char]}\ttrying: {string + char + char}")
         string += str(min(d, key=d.get))
     else:
         string += min(d, key=d.get)
