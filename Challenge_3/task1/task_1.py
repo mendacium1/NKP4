@@ -9,7 +9,6 @@ SERVER_PORT = 31337
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((SERVER_HOST, SERVER_PORT))
 
-#msg1 = "jakihatnenkleinenhihihihi"
 msg1 = "secret="    # durch zlib wird "'secret=' + b'secret='" zu "secret="
 
 def send_and_get_len(char):

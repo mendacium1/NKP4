@@ -87,7 +87,6 @@ def task_2(host, port):
             #print(f"reference_cipher:\t{reference_cipher}\t\tlen -> {len(reference_cipher)/2}")
             bf_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
 
-            """
             current_char = ""
 
             for char in string.printable:
@@ -105,34 +104,13 @@ def task_2(host, port):
                     break
             if current_char == "":
                 print(f"{bcolors.FAIL}Done{bcolors.ENDC}")
-                exit()
-            reference_message = reference_message[:-1]
-            init_bf_message = init_bf_message[1:] + current_char.encode()
-            secret += current_char
-            print(f"{bcolors.HEADER}secret=:\t{secret}{bcolors.ENDC}")
-            """
-            current_char = 0
-
-            for char in range(0, 256):
-                # print("------------------------------------------------------------------------------------------------")
-                bf_message = init_bf_message + char.to_bytes(1, 'big')
-                # print(f"bf_message:\t\t\t{bf_message.hex()}\t\tlen -> {len(bf_message)}")
-
-                response_data = send_message(s, bf_message, bf_iv)
-                bf_iv = bytes.fromhex(response_data['ciphertext'])[-16:]
-                # print(f"Check:\t\t\t\t{response_data['ciphertext'][:hex_size]}")
-                # print(f"with:\t\t\t\t{reference_cipher}")
-                if response_data['ciphertext'][:hex_size] == reference_cipher:
-                    # print(f"{bcolors.OKGREEN}found it: {char}{bcolors.ENDC}")
-                    current_char = char
-                    break
-            if current_char == 0:
-                print(f"{bcolors.FAIL}Done{bcolors.ENDC}")
                 break
             reference_message = reference_message[:-1]
-            init_bf_message = init_bf_message[1:] + current_char.to_bytes(1, 'big')
-            secret2 += chr(current_char)
+            init_bf_message = init_bf_message[1:] + current_char.encode()
+            secret2 += current_char
             print(f"{bcolors.HEADER}secret2={secret2}{bcolors.ENDC}")
+
+        return secret2
 
 def main():
     host = '193.170.192.172'
@@ -141,7 +119,7 @@ def main():
 
     url = 'https://www.moneybit.at/challenge3.php'
     cookies = {
-        'secret': 'Vanillle',
+        'secret': 'Vanille',
         'secret2': cookie_2
     }
 
