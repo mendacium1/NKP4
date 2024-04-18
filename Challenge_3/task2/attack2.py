@@ -99,7 +99,7 @@ def task_2(host, port):
                 #print(f"Check:\t\t\t\t{response_data['ciphertext'][:hex_size]}")
                 #print(f"with:\t\t\t\t{reference_cipher}")
                 if response_data['ciphertext'][:hex_size] == reference_cipher:
-                    #print(f"{bcolors.OKGREEN}found it: {char}{bcolors.ENDC}")
+                    print(f"{bcolors.OKGREEN}found it: {char}{bcolors.ENDC}")
                     current_char = char
                     break
             if current_char == "":
