@@ -1,0 +1,143 @@
+6. NKP - CHALLENGE
+''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+1. AUFGABE
+######################################################################
+Tools:
+- nmap
+- ettercap
+-
+
+Informationen über Netzwerk:
+
+JONAS
+IP Default Gateway von jonas
+	ip route
+	default via 10.19.86.1 ens33
+	10.19.86.0/24 dev ens33 kernel scope src 10.19.86.10
+Default Gateway == .1
+
+IP & MAC von jonas
+	ip addr
+	-> ipv4 == 10.19.86.10/24
+	-> mac == 00:0c:29:9d:af:c7
+
+IP & MAC von .1 von winden
+	sudo nmap -sS 10.19.86.1
+	-> ipv4 == 10.19.86.1
+	-> mac == 00:0c:29:75:31:39
+	-> all ports are closed
+
+IP & MAC von .10 von jonas
+	sudo nmap -sS 10.19.86.10
+	-> ipv4 == 10.19.86.10
+	-> mac == 00:0c:29:9d:af:c7
+	-> ssh open
+
+IP & MAC von .10 von mikkel
+	sudo nmap -sS 10.19.86.20
+	-> ipv4 == 10.19.86.20
+	-> mac == 00:0c:29:DB:41:62
+	-> keine Ports offen
+
+Host scan
+	sudo -sn 10.19.86.0/24
+	-> ipv4 == 10.19.86.1 (winden)
+	-> ipv4 == 10.19.86.10 (jonas)
+	-> ipv4 == 10.19.86.20 (mickel)
+
+
+
+
+2. AUFGABE - Eavesdropping
+######################################################################
+= Kommunikation im geswitchten Netzwerk - geeigenete Angriffstechnik -> Zugriff auf Kommunikation
+
+2.0 Kali
+	-> Kali verwenden mit LAN-Segment DARK1 wie jonas
+	-> Netzwerkverbindung einstellen und ip von jonas übernehmen
+
+2.1 ARP-Spoofing.
+	= Ettercap auf die IPs 10.19.86.20 && 10.19.86.1
+	-> 1. ARP-Spoofing starten
+	-> Wireshark starten auf Interface eth0
+		DNS - hgtannhaus.sin-lab.at SOA 185.252.72.66 == Kommunikation mit Internet
+	--> dig in hgtannhaus.sin-lab.at +noall +answer
+	--> hgtannhaus.sin-lab.at.  3532    IN      A       185.252.72.66
+
+	ARP Spoofing
+	= manipulieren von Einträgen in der ARP-Tabelle (enthält MAC des Angreifers zu IP des eigentlichen Ziels = Weiterleitung manipulieren)
+	Gegenmaßnahmen: ARPwatch, TLS, statische ARP Einträge
+	-> sage hier ich bin Router - Mickel sendet alles was im Internet ist zu Jonas
+	Mickel -> Router -> Internet
+	Mickel -> Jonas (IP == Router, MAC == Jonas)
+	
+	-> geswitchtes Netzwerk
+
+	Eavesdropping
+	= Attacke auf die Kommunikation  zwischen 2 Teilnehmer
+	-> sehe Kommunikation mit dem Internet - DNS ist aber nicht erreichbar
+	
+
+
+2.2 DNS-Spoofing
+	-> bevor spoofing gestartet werden kann etter.dns File editieren
+	--> File Editieren & Eintrag hinzufügen
+		--> sudo nano /etc/ettercap/etter.dns
+			hgtannhaus.sin-lab.at A 10.19.86.10 1800
+			*.hgtannhaus.sin-lab.at A 10.19.86.10 1800
+
+	-> Targets zuteilen - IPs 10.19.86.20 && 10.19.86.1
+	-> Arp Poisoning starten
+	-> Plugins - Manage Plugins und dns spoofing aktivieren (spoofing stoppen und wieder starten)
+		--> manchmal ettercap -G (so starten)
+	-> Wireshark starten
+	
+	OUTPUT
+	-> bekomme geänderte Destination für 
+	--> hgtannhaus.sin-lab.at SOA 10.19.86.10
+	--> leite jetzt den Verkehr zu mir um 
+ 	--> Frame mit Port unreachable
+	--> Frame haben hier private Adresse == 10.19.53.10
+	
+	brauchen MitM-Angriff
+	-> abfangen von http Daten die über TLS gesendet werden
+
+
+	DNS Spoofing
+	= fälschen eines DNS Responses auf ein korrektes DNS Query -> um gefälschten Hostname zu IP-Adresse zu machen
+	-> notwendig zum Umleiten des Netzwerkverkehrs von hgtannhaus zu Jonas
+	-> DNS keine Integrität + Authentizität
+	Schritte:
+		- Angreifer erstellen gefälschten DNS Eintrag == hgtannhaus.sin-lab.at A Jonas=	10.19.53.10 
+		- fälschen A Record
+	Gegenmaßnahmen: DNSSEC, Transaction Signature
+
+
+2.3 PORTUMLEITUNG
+
+2.3.1 Weiterleitung aktivieren
+	= IP-Weiterleitungsstatus auf 1 setzen (aktivieren)
+	-> sudo sysctl -w net.ipv4.ip_forward=1
+
+2.3.2 IP-Regel für http
+	= Umleitung von http Traffic auf Port 8080
+	-> sudo iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 80 -j REDIRECT --to-port 8080
+
+2.3.3 mitmproxy
+	-> mitmproxy -p 8080
+	-> Request + Response 
+	-> URI mit wo Bild abgerufen wird
+	-> png erscheint
+	
+	MitM-Proxy
+	-> Kommunikation abfangen & an richtigen Server weiterleiten
+	= Request + Response	
+	= Man in the middle
+	
+
+
+3. AUFGABE
+######################################################################
+= offensiver Angriff - auf Basis Erkenntnis aus T2
+
